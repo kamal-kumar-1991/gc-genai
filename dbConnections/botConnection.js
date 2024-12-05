@@ -1,25 +1,34 @@
-const mongoose = require('mongoose');
-const { Schema } = mongoose;
-const db2 = mongoose.createConnection(process.env.BOT_DB_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-  maxPoolSize: 10,
-  serverSelectionTimeoutMS: 5000,
-  socketTimeoutMS: 45000
-})
-const enterprise_data = new Schema({}, { strict: false, versionKey: false, collection: 'enterprise_data' });
-const col_enterprise_data = db2.model('enterprise_data', enterprise_data);
-const bot_collection_schema = new Schema({}, { strict: false, versionKey: false, collection: 'botConfig' });
-const bot_config = db2.model('botConfig', bot_collection_schema);
-const enterprise_data_sources = new Schema({}, { strict: false, versionKey: false, collection: 'enterprise_data_sources' });
-const col_enterprise_data_sources = db2.model('enterprise_data_sources', enterprise_data_sources);
+const { Schema, createConnection } = require('mongoose');
+const { ObjectId } = require('mongodb');
+const db2 = createConnection(process.env.BOT_DB_URI)
+const chatbots = new Schema({}, { strict: false, versionKey: false, collection: 'col_chatbots' });
+const col_chatbots = db2.model('col_chatbots', chatbots);
+const enterprise_data_tasks = new Schema({}, { strict: false, versionKey: false, collection: 'col_enterprise_data_tasks' });
+const col_enterprise_data_tasks = db2.model('col_enterprise_data_tasks', enterprise_data_tasks);
+const enterprise_data_taskgroups = new Schema({}, { strict: false, versionKey: false, collection: 'col_enterprise_data_taskgroups' });
+const col_enterprise_data_taskgroups = db2.model('col_enterprise_data_taskgroups', enterprise_data_taskgroups);
+
+
+exports.fetchChatbotDetails = async (chatbot_id) => {
+    try{
+            const chatbot_details = await col_chatbots.findOne({"_id":new ObjectId(chatbot_id)});
+            if(chatbot_details) {
+                    return chatbot_details
+            }
+            else{ 
+                    return false;
+            }
+    }catch(error){
+
+    }
+}
 
 exports.fetchTaskInformation = async (task_id) => {
     try{    
        
-        let query = { _id: new mongoose.Types.ObjectId(task_id)};
+        let query = { _id: new ObjectId(task_id)};
         
-        const task_information =  await col_enterprise_data.findOne(query);
+        const task_information =  await col_enterprise_data_tasks.findOne(query);
         if(task_information)
         {
             return task_information;
@@ -35,26 +44,29 @@ exports.fetchTaskInformation = async (task_id) => {
 
 exports.updateTask = async (task_id, updateInformation) => {
     try {
-        await col_enterprise_data.updateOne({_id: new mongoose.Types.ObjectId(task_id)}, {$set:updateInformation});
+        await col_enterprise_data_tasks.updateOne({_id: new ObjectId(task_id)}, {$set:updateInformation});
     } catch (error) {
         
     }
 }
 
-exports.insertEnterpriseData = async (insertObj, callback) => {
+exports.insertEnterpriseData = async (insertObj) => {
     try {
-        col_enterprise_data.insertOne(insertObj);
-        callback(true);
+        const insertIds = await col_enterprise_data_tasks.insertMany([insertObj]);
+        if(insertIds && insertIds[0])
+            return insertIds[0]._id;
+        return false;
+
     } catch(ex) {
-        console.log(ex);
-        callback(false);
+        console.log('Error:: insertEnterpriseData: ', ex);
+        return false;
     }
     
 }
 
-exports.fetchDataSource = async (filter) => {
+exports.fetchEnterpriseSource = async (query) => {
     try{    
-        const data_source_information =  await col_enterprise_data_sources.findOne({filter});
+        const data_source_information =  await col_enterprise_data_taskgroups.findOne(query);
         if(data_source_information)
         {
             return data_source_information;
@@ -62,33 +74,17 @@ exports.fetchDataSource = async (filter) => {
             return false;
         }
     }catch(error){
+        console.log(error)
         return false;
-        // console.log(error)
+        
     }   
 }
 
-exports.updateDataSource = async (source_id, updateInformation) => {
+exports.updateEnterpriseSource = async (updateFilter, updateInformation) => {
     try {
-        await col_enterprise_data_sources.updateOne({_id: new mongoose.Types.ObjectId(source_id)}, {$set:updateInformation});
+        await col_enterprise_data_taskgroups.updateOne(updateFilter, {$set:updateInformation});
     } catch (error) {
         
     }
 }
 
-exports.fetchBotDetails = async (bot_id) => {
-    try {
-        let query = {id:bot_id};
-        console.log(query)
-        const botDetails = await bot_config.findOne(query);
-        if(botDetails)
-        {
-            return botDetails
-        }
-        else{
-            return false;
-        }
-    } catch (e) {
-        console.log(e);
-            return false
-    }
-}
